@@ -6,10 +6,10 @@ require 'delayed_job_celluloid/version'
 Gem::Specification.new do |s|
   s.name          = "delayed_job_celluloid"
   s.version       = DelayedJobCelluloid::VERSION
-  s.authors       = ["tom"]
+  s.authors       = ["Tom Mooney"]
   s.email         = ["tmooney3979@gmail.com"]
-  s.description   = %q{TODO: Write a gem description}
-  s.summary       = %q{TODO: Write a gem summary}
+  s.description   = %q{run delayed_job workers in multiple threads within a single process}
+  s.summary       = %q{multi-threaded delayed_job workers!}
   s.homepage      = ""
   s.license       = "MIT"
 
@@ -23,5 +23,6 @@ Gem::Specification.new do |s|
 
   s.add_development_dependency "bundler", "~> 1.3"
   s.add_development_dependency "rake"
-  s.add_development_dependency 'sqlite3'
+  s.add_development_dependency "sqlite3"
+  s.add_development_dependency "delayed_job_active_record"
 end

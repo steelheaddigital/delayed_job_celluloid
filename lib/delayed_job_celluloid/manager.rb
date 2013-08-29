@@ -35,10 +35,13 @@ module DelayedJobCelluloid
 
       @done = false
       @busy = []
-      @ready = @worker_count.times.map { Worker.new_link(options, current_actor) }
+      @ready = @worker_count.times.map do  
+        Worker.new_link(options, current_actor)
+      end
     end
     
     def start
+      DelayedJobCelluloid.logger.info { "Starting #{@ready.size} worker threads" }
       @ready.each_with_index do |worker, index|
         worker.name = @worker_count == 1 ? "delayed_job" : "delayed_job.#{index}"
         worker.async.start 
@@ -63,6 +66,7 @@ module DelayedJobCelluloid
     
     def worker_done(worker)
       @busy.delete(worker)
+      @threads.delete(worker.object_id)
       if stopped?
         worker.terminate if worker.alive?
         signal(:shutdown) if @busy.empty?
@@ -72,10 +76,13 @@ module DelayedJobCelluloid
     end
     
     def worker_died(worker, reason)
+      DelayedJobCelluloid.logger.info { "worker #{worker.name} died for reason: #{reason}" }
       @busy.delete(worker)
+      @threads.delete(worker.object_id)
       
       unless stopped?
-        @ready << Worker.new_link(@options, current_actor)
+        worker = Worker.new_link(@options, current_actor)
+        @ready << worker
         worker.async.start
       else
         signal(:shutdown) if @busy.empty?

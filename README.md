@@ -1,6 +1,6 @@
 # DelayedJobCelluloid
 
-Allows delayed_job workers to be run in multiple threads within a single process
+Based on Sidekiq, this allows delayed job workers to be run in multiple threads within a single process using the Celluloid actor pattern.
 
 ## Installation
 
