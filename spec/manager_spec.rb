@@ -69,7 +69,6 @@ class ManagerSpec < Minitest::Unit::TestCase
     
     it 'removes workers from busy list on worker_died and starts a new worker' do
       worker = Minitest::Mock.new
-      worker.expect(:name, nil, [])
       
       mgr = DelayedJobCelluloid::Manager.new({}, 0)
       mgr.busy << worker

@@ -23,6 +23,7 @@ require_relative 'worker'
 module DelayedJobCelluloid
   class Manager
     include Celluloid
+    include Logger
     
     trap_exit :worker_died
     
@@ -36,15 +37,14 @@ module DelayedJobCelluloid
 
       @done = false
       @busy = []
-      @ready = @worker_count.times.map do  
+      @ready = @worker_count.times.map do
         Worker.new_link(options, current_actor)
       end
     end
     
     def start
-      DelayedJobCelluloid.logger.info { "Starting #{@ready.size} worker threads" }
       @ready.each_with_index do |worker, index|
-        worker.name = @worker_count == 1 ? "delayed_job" : "delayed_job.#{index}"
+        worker.name = "delayed_job.#{index}"
         worker.async.start 
       end
     end
@@ -76,11 +76,10 @@ module DelayedJobCelluloid
     end
     
     def worker_died(worker, reason)
-      DelayedJobCelluloid.logger.info { "worker #{worker.name} died for reason: #{reason}" }
       @busy.delete(worker)
-      
       unless stopped?
         worker = Worker.new_link(@options, current_actor)
+        worker.name = "restarted"
         @ready << worker
         worker.async.start
       else

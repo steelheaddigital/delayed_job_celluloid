@@ -18,7 +18,7 @@ class LauncherSpec < Minitest::Unit::TestCase
         i += 1
       end
       
-      launcher = DelayedJobCelluloid::Launcher.new({}, 3)
+      launcher = DelayedJobCelluloid::Launcher.new({}, 2)
       launcher.run
     end
     
