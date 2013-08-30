@@ -49,6 +49,40 @@ class ManagerSpec < Minitest::Unit::TestCase
       assert_equal mgr.ready.size, 0
       worker.verify
     end
+    
+    it 'removes workers from busy list and adds them to ready list on completion' do
+      worker = Minitest::Mock.new
+      worker.expect(:alive?, true, [])
+      
+      mgr = DelayedJobCelluloid::Manager.new({}, 0)
+      mgr.busy << worker
+  
+      assert_equal 0, mgr.ready.size
+      assert_equal 1, mgr.busy.size
+      
+      mgr.worker_done(worker)
+    
+      assert_equal 1, mgr.ready.size
+      assert_equal 0, mgr.busy.size
+      worker.verify
+    end
+    
+    it 'removes workers from busy list on worker_died and starts a new worker' do
+      worker = Minitest::Mock.new
+      worker.expect(:name, nil, [])
+      
+      mgr = DelayedJobCelluloid::Manager.new({}, 0)
+      mgr.busy << worker
+  
+      assert_equal 0, mgr.ready.size
+      assert_equal 1, mgr.busy.size
+      
+      mgr.worker_died(worker, "test")
+    
+      assert_equal 0, mgr.ready.size
+      assert_equal 1, mgr.busy.size
+      worker.verify
+    end
   
   end
 end

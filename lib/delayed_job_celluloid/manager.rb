@@ -27,6 +27,7 @@ module DelayedJobCelluloid
     trap_exit :worker_died
     
     attr_reader :ready
+    attr_reader :busy
     
     def initialize(options={}, worker_count)
       @options = options
@@ -66,7 +67,6 @@ module DelayedJobCelluloid
     
     def worker_done(worker)
       @busy.delete(worker)
-      @threads.delete(worker.object_id)
       if stopped?
         worker.terminate if worker.alive?
         signal(:shutdown) if @busy.empty?
@@ -78,7 +78,6 @@ module DelayedJobCelluloid
     def worker_died(worker, reason)
       DelayedJobCelluloid.logger.info { "worker #{worker.name} died for reason: #{reason}" }
       @busy.delete(worker)
-      @threads.delete(worker.object_id)
       
       unless stopped?
         worker = Worker.new_link(@options, current_actor)
