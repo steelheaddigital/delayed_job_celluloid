@@ -6,7 +6,7 @@ Based on awesome gems like Sidekiq and Suckerpunch, DelayedJobCelluloid allows d
 
 Add delayed_job_celluloid to your gem file
 
-	gem 'delayed_job_celluloid
+	gem 'delayed_job_celluloid'
 
 Run bundle install
 
