@@ -17,7 +17,9 @@ class WorkerSpec < Minitest::Unit::TestCase
       async = Minitest::Mock.new
       100.times {async.expect(:work, nil, [Celluloid::ActorProxy])}
       100.times {async.expect(:worker_done, nil, [Celluloid::ActorProxy])}
+      async.expect(:real_thread, async, [nil, Thread])
       100.times {manager.expect(:async, async, [])}
+      
     
       worker = DelayedJobCelluloid::Worker.new({},manager)
       test = TestJob.new

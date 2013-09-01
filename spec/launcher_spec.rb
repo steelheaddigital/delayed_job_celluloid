@@ -4,10 +4,6 @@ require_relative 'test_job'
 class LauncherSpec < Minitest::Unit::TestCase
   describe 'launcher' do
     
-    before :all do
-      
-    end
-    
     it "starts working jobs" do    
       DelayedJobCelluloid::Worker.exit_on_complete = true
         

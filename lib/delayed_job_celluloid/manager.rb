@@ -1,23 +1,3 @@
-#
-#Copyright 2013 Neighbor Market
-#
-#This file is part of Neighbor Market.
-#
-#Neighbor Market is free software: you can redistribute it and/or modify
-#it under the terms of the GNU General Public License as published by
-#the Free Software Foundation, either version 3 of the License, or
-#(at your option) any later version.
-#
-#Neighbor Market is distributed in the hope that it will be useful,
-#but WITHOUT ANY WARRANTY; without even the implied warranty of
-#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#GNU General Public License for more details.
-#
-#You should have received a copy of the GNU General Public License
-#along with Neighbor Market.  If not, see <http://www.gnu.org/licenses/>.
-#
-
-require 'celluloid'
 require_relative 'worker'
 
 module DelayedJobCelluloid
@@ -35,10 +15,14 @@ module DelayedJobCelluloid
       @worker_count = worker_count || 1
       @done_callback = nil
 
+      @in_progress = {}
+      @threads = {}
       @done = false
       @busy = []
       @ready = @worker_count.times.map do
-        Worker.new_link(options, current_actor)
+        w = Worker.new_link(options, current_actor)
+        w.proxy_id = w.object_id
+        w
       end
     end
     
@@ -49,15 +33,17 @@ module DelayedJobCelluloid
       end
     end
 
-    def stop      
+    def stop(timeout)   
       @done = true
+            
+      info "Shutting down #{@ready.size} idle workers"
       @ready.each do |worker|
-        worker.stop
         worker.terminate if worker.alive?
       end
       @ready.clear
       
       return after(0) { signal(:shutdown) } if @busy.empty?
+      hard_shutdown_in timeout
     end
     
     def work(worker)
@@ -76,6 +62,7 @@ module DelayedJobCelluloid
     end
     
     def worker_died(worker, reason)
+      debug "#{worker.inspect} died because of #{reason}" unless reason.nil?
       @busy.delete(worker)
       unless stopped?
         worker = Worker.new_link(@options, current_actor)
@@ -89,6 +76,37 @@ module DelayedJobCelluloid
 
     def stopped?
       @done
+    end
+    
+    def real_thread(proxy_id, thr)
+      @threads[proxy_id] = thr
+    end
+    
+    def hard_shutdown_in(delay)
+      info "Pausing up to #{delay} seconds to allow workers to finish..." 
+
+      after(delay) do
+        # We've reached the timeout and we still have busy workers.
+        # They must die but their messages shall live on.
+        info "Still waiting for #{@busy.size} busy workers"
+
+        # Re-enqueue terminated jobs
+        # NOTE: You may notice that we may push a job back to redis before
+        # the worker thread is terminated. This is ok because Sidekiq's
+        # contract says that jobs are run AT LEAST once. Process termination
+        # is delayed until we're certain the jobs are back in Redis because
+        # it is worse to lose a job than to run it twice.
+        #Sidekiq::Fetcher.strategy.bulk_requeue(@in_progress.values)
+
+        debug "Terminating #{@busy.size} busy worker threads"
+        @busy.each do |worker|
+          if worker.alive? && t = @threads.delete(worker.object_id)
+            t.raise Shutdown
+          end
+        end
+
+        after(0) { signal(:shutdown) }
+      end
     end
     
   end

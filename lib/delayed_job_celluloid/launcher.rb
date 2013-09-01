@@ -13,7 +13,7 @@ module DelayedJobCelluloid
     end
 
     def stop
-      manager.async.stop
+      manager.async.stop(options[:timeout])
       manager.wait(:shutdown)
     end
   end

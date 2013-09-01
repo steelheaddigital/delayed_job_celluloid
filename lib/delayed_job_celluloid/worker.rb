@@ -1,10 +1,11 @@
 require 'delayed_job'
-require 'celluloid'
 require 'delayed/performable_mailer'
 
 module DelayedJobCelluloid
   class Worker < Delayed::Worker
     include Celluloid
+
+    attr_accessor :proxy_id
 
     def initialize(options={}, manager)
       @manager = manager
@@ -21,31 +22,34 @@ module DelayedJobCelluloid
     end
     
     def start
-      say "Starting job worker"
+      begin
+        say "Starting job worker"
+        @manager.async.real_thread(proxy_id, Thread.current)
+        self.class.lifecycle.run_callbacks(:execute, self) do
+          loop do
+              self.class.lifecycle.run_callbacks(:loop, self) do
+                @realtime = Benchmark.realtime do
+                  @result = work_off
+                end
+              end
 
-      self.class.lifecycle.run_callbacks(:execute, self) do
-        loop do
-          self.class.lifecycle.run_callbacks(:loop, self) do
-            @realtime = Benchmark.realtime do
-              @result = work_off
-            end
+              count = @result.sum
+
+              if count.zero?
+                if self.class.exit_on_complete
+                  say "No more jobs available. Exiting"
+                  break
+                else
+                  sleep(self.class.sleep_delay) unless stop?
+                end
+              else
+                say "#{count} jobs processed at %.4f j/s, %d failed" % [count / @realtime, @result.last]
+              end
+
+              break if stop?
           end
-
-          count = @result.sum
-
-          if count.zero?
-            if self.class.exit_on_complete
-              say "No more jobs available. Exiting"
-              break
-            else
-              sleep(self.class.sleep_delay) unless stop?
-            end
-          else
-            say "#{count} jobs processed at %.4f j/s, %d failed" % [count / @realtime, @result.last]
-          end
-
-          break if stop?
         end
+        rescue DelayedJobCelluloid::Shutdown
       end
     end
     

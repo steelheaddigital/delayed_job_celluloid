@@ -32,7 +32,6 @@ class ManagerSpec < Minitest::Unit::TestCase
   
     it 'stops workers on stop' do
       worker = Minitest::Mock.new
-      3.times {worker.expect(:stop, nil, [])}
       3.times {worker.expect(:terminate, nil, [])}
       3.times {worker.expect(:alive?, true, [])}
     
@@ -44,7 +43,9 @@ class ManagerSpec < Minitest::Unit::TestCase
         i += 1
       end
   
-      mgr.stop
+      mgr.busy << worker
+  
+      mgr.stop(8)
     
       assert_equal mgr.ready.size, 0
       worker.verify
