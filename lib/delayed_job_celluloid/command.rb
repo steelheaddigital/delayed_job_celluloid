@@ -1,7 +1,7 @@
 $stdout.sync = true
 
 require 'optparse'
-require 'celluloid/autostart'
+require 'celluloid'
 
 module DelayedJobCelluloid
   
@@ -11,32 +11,91 @@ module DelayedJobCelluloid
     
     attr_accessor :worker_count
 
+    def logger
+      DelayedJobCelluloid.logger
+    end
+
     def initialize(args)
       parse_options(args)
     end
-  
+
+    def daemonize
+
+      Daemons.run_proc('delayed_job_celluloid', :dir => @options[:pid_dir], :dir_mode => :normal, :monitor => @monitor,
+                                                                                            :ARGV => @args) do |*_args|
+        Celluloid.register_shutdown
+        Celluloid.start
+        DelayedJobCelluloid.logger = Logger.new(@options[:log_file])
+        logger.formatter = proc do |severity, datetime, progname, msg|
+          "#{datetime}: #{msg}\n"
+        end
+
+        logger.info 'Celluloid daemon started'
+        $0 = File.join(@options[:prefix], 'delayed_job_celluloid') if @options[:prefix]
+        launch_celluloid(false)
+      end
+    end
+
+    # Run Celluloid in the foreground
     def run
-      self_read, self_write = IO.pipe
-      
-      %w(INT TERM).each do |sig|
-        trap sig do
-          self_write.puts(sig)
+
+      # Run in the background if daemonizing
+      (daemonize; return) if @options[:daemonize]
+
+      # Otherwise, run in the foreground
+      launch_celluloid(true)
+    end
+
+    def launch_celluloid(in_foreground = true)
+
+      if in_foreground
+        Celluloid.start
+        self_read, self_write = IO.pipe
+        %w(INT TERM).each do |sig|
+          trap sig do
+            self_write.puts(sig)
+          end
         end
       end
-      
+
       require 'delayed_job_celluloid/launcher'
       @launcher = Launcher.new(@options, @worker_count)
-      
+
+      unless in_foreground
+        # Daemonized - wait to receive a signal
+        %w(INT TERM).each do |sig|
+          trap sig do
+            handle_signal(sig)
+          end
+        end
+      end
+
       begin
+
+        logger.info 'Begin celluloid launcher'
         @launcher.run
-        
-        while readable_io = IO.select([self_read])
-          signal = readable_io.first[0].gets.strip
-          handle_signal(signal)
+
+        if in_foreground
+          while readable_io = IO.select([self_read])
+            signal = readable_io.first[0].gets.strip
+            handle_signal(signal)
+          end
+        else
+
+          # Sleep for a bit
+          while true
+            sleep 60
+          end
+
         end
       rescue Interrupt
+        logger.info 'Shutting down celluloid launcher'
         @launcher.stop
         exit(0)
+
+      rescue => e
+        DelayedJobCelluloid.logger.info "Exception: #{e.message}"
+        DelayedJobCelluloid.logger.info Kernel.caller
       end
     end
     
@@ -45,13 +104,13 @@ module DelayedJobCelluloid
       when 'INT','TERM'
         raise Interrupt
       end
-        
     end
     
     def parse_options(args)
       @options = {
         :quiet => true,
-        :timeout => 8
+        :timeout => 8,
+        :log_file => 'celluloid.log'
       }
 
       @worker_count = 2
@@ -90,11 +149,20 @@ module DelayedJobCelluloid
         opts.on('--queue=queue', "Specify which queue DJ must look up for jobs") do |queue|
           @options[:queues] = queue.split(',')
         end
+        opts.on('--pool=queue1[,queue2][:worker_count]', 'Specify queues and number of workers for a worker pool') do |pool|
+          parse_worker_pool(pool)
+        end
         opts.on('--exit-on-complete', "Exit when no more jobs are available to run. This will exit if all jobs are scheduled to run in the future.") do
           @options[:exit_on_complete] = true
         end
         opts.on('-t', '--timeout NUM', "Shutdown timeout") do |prefix|
           @options[:timeout] = Integer(arg)
+        end
+        opts.on('--daemonize', "Daemonize") do
+          @options[:daemonize] = true
+        end
+        opts.on('--log FILE', "Log file for celluloid") do |log_file|
+          @options[:log_file] = log_file
         end
       end
       @args = opts.parse!(args)
