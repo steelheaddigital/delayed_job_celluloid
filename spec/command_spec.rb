@@ -1,9 +1,9 @@
 require_relative 'spec_helper'
 require_relative 'test_job'
 
-class CommandSpec < Minitest::Unit::TestCase
+class CommandSpec < Minitest::Test
   describe 'command' do
-    
+
     it "starts workers" do  
       i = 0  
       while i < 10 do

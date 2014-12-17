@@ -1,8 +1,12 @@
 require_relative 'spec_helper'
 
-class ManagerSpec < Minitest::Unit::TestCase
+class ManagerSpec < Minitest::Test
   describe 'manager' do
   
+    before :all do
+      DelayedJobCelluloid::Worker.exit_on_complete = true
+    end
+    
     it "creates N worker instances" do
       mgr = DelayedJobCelluloid::Manager.new({}, 3)
       assert_equal mgr.ready.size, 3
@@ -79,8 +83,9 @@ class ManagerSpec < Minitest::Unit::TestCase
       
       mgr.worker_died(worker, "test")
     
-      assert_equal 0, mgr.ready.size
-      assert_equal 1, mgr.busy.size
+      assert_equal false, mgr.stopped?
+      assert_equal 1, mgr.ready.size
+      assert_equal 0, mgr.busy.size
       worker.verify
     end
   

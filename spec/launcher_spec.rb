@@ -1,7 +1,7 @@
 require_relative 'spec_helper'
 require_relative 'test_job'
 
-class LauncherSpec < Minitest::Unit::TestCase
+class LauncherSpec < Minitest::Test
   describe 'launcher' do
     
     it "starts working jobs" do    

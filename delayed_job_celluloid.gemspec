@@ -13,16 +13,18 @@ Gem::Specification.new do |s|
   s.homepage      = ""
   s.license       = "MIT"
 
-  s.files         = `git ls-files`.split($/)
+  s.files         = `git ls-files | grep -Ev '^(testapp)'`.split("\n")
   s.executables   = s.files.grep(%r{^bin/}) { |f| File.basename(f) }
   s.test_files    = s.files.grep(%r{^(test|spec|features)/})
   s.require_paths = ["lib"]
 
-  s.add_dependency 'delayed_job'
-  s.add_dependency 'celluloid'
+  s.add_dependency 'delayed_job', ">= 4.0.0"
+  s.add_dependency 'celluloid', ">= 0.16.0"
 
   s.add_development_dependency "bundler", "~> 1.3"
   s.add_development_dependency "rake"
   s.add_development_dependency "sqlite3"
-  s.add_development_dependency "delayed_job_active_record"
+  s.add_development_dependency "delayed_job_active_record", ">= 4.0.0"
+  s.add_development_dependency "rails", "~> 4.1.0"
+  s.add_development_dependency "minitest", "~> 5.5.0"
 end

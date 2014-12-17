@@ -1,5 +1,4 @@
 require 'delayed_job'
-require 'delayed/performable_mailer'
 
 module DelayedJobCelluloid
   class Worker < Delayed::Worker

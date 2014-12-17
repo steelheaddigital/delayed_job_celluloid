@@ -90,14 +90,6 @@ module DelayedJobCelluloid
         # They must die but their messages shall live on.
         info "Still waiting for #{@busy.size} busy workers"
 
-        # Re-enqueue terminated jobs
-        # NOTE: You may notice that we may push a job back to redis before
-        # the worker thread is terminated. This is ok because Sidekiq's
-        # contract says that jobs are run AT LEAST once. Process termination
-        # is delayed until we're certain the jobs are back in Redis because
-        # it is worse to lose a job than to run it twice.
-        #Sidekiq::Fetcher.strategy.bulk_requeue(@in_progress.values)
-
         debug "Terminating #{@busy.size} busy worker threads"
         @busy.each do |worker|
           if worker.alive? && t = @threads.delete(worker.object_id)
