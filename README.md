@@ -67,7 +67,10 @@ Currently the gem does not support daemonization of the main process because I h
 	    ActiveRecord::Base.establish_connection
 	end
 
-If you are interested in adding daemonization to the gem itself, feel free to fork it and submit a pull request.
+## Daemonization
+
+    script/delayed_job_celluloid --daemonize --log /path/to/my/logfile.log start
+    script/delayed_job_celluloid --daemonize --log /path/to/my/logfile.log stop
 
 ## Contributing
 
