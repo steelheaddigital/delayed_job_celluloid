@@ -2,6 +2,7 @@ $stdout.sync = true
 
 require 'optparse'
 require 'celluloid'
+require 'daemons'
 
 module DelayedJobCelluloid
   
