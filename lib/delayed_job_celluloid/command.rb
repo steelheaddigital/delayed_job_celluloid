@@ -21,7 +21,7 @@ module DelayedJobCelluloid
 
     def daemonize
 
-      Daemons.run_proc('delayed_job_celluloid', :dir => @options[:pid_dir], :dir_mode => :normal, :monitor => @monitor,
+      Daemons.run_proc(@options[:worker_name], :dir => @options[:pid_dir], :dir_mode => :normal, :monitor => @monitor,
                                                                                             :ARGV => @args) do |*_args|
         Celluloid.register_shutdown
         Celluloid.start
@@ -110,7 +110,8 @@ module DelayedJobCelluloid
       @options = {
         :quiet => true,
         :timeout => 8,
-        :log_file => 'celluloid.log'
+        :log_file => 'celluloid.log',
+        :worker_name => 'delayed_job_celluloid'
       }
 
       @worker_count = 2
@@ -133,6 +134,12 @@ module DelayedJobCelluloid
         end
         opts.on('-n', '--number_of_workers=workers', "Number of worker threads to start") do |worker_count|
           @worker_count = worker_count.to_i rescue 1
+        end
+        opts.on('--pid-dir=DIR', 'Specifies an alternate directory in which to store the process ids.') do |dir|
+          @options[:pid_dir] = dir
+        end
+        opts.on('--worker-name=NAME', 'Specifies an alternate worker name') do |name|
+          @options[:worker_name] = name
         end
         opts.on('--sleep-delay N', "Amount of time to sleep when no jobs are found") do |n|
           @options[:sleep_delay] = n.to_i
