@@ -8,6 +8,7 @@ require 'active_record'
 require 'sqlite3'
 require 'logger'
 require 'celluloid/autostart'
+require 'rails'
 
 ROOT = File.join(File.dirname(__FILE__), '..')
 RAILS_ROOT = ROOT

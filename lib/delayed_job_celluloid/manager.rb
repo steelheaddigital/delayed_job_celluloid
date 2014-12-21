@@ -29,6 +29,7 @@ module DelayedJobCelluloid
     def start
       @ready.each_with_index do |worker, index|
         worker.name = "delayed_job.#{index}"
+        DelayedJobCelluloid.logger.info "Starting worker #{worker.name}"
         worker.async.start 
       end
     end

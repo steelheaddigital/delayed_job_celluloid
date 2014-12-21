@@ -9,6 +9,7 @@ module DelayedJobCelluloid
     end
 
     def run
+      DelayedJobCelluloid.logger.info 'Launching delayed_job_celluloid'
       manager.async.start
     end
 

@@ -36,7 +36,20 @@ One important thing to bear in mind with this is that you should have a database
   	  	host: localhost
   	  	pool: 5
 
-Currently the gem does not support daemonization of the main process because I haven't needed it as I am using it in conjuction with Unicorn on Heroku.  If you are running your app on Heroku, this gem will allow you to run multiple workers in a single Unicorn process.  An example unicorn config is as follows:
+The gem also does not work particularly well with Sqlite since Sqlite does not handle concurrent reads/writes.  You will see locking errors, although delayed job handles these gracefully by retrying the job later.
+
+## Daemonization
+
+    script/delayed_job_celluloid -d start
+    script/delayed_job_celluloid -d stop
+
+You can also start the daemon with a monitor process that will restart the daemon if it crashes
+
+	script/delayed_job_celluloid -d -m start
+	
+##Heroku
+
+If you are running your app on Heroku, this gem will allow you to run multiple workers in a single Unicorn process.  An example unicorn config is as follows:
 
 	# config/unicorn.rb
 	worker_processes Integer(ENV["WEB_CONCURRENCY"] || 2)
@@ -66,11 +79,6 @@ Currently the gem does not support daemonization of the main process because I h
 	  defined?(ActiveRecord::Base) and
 	    ActiveRecord::Base.establish_connection
 	end
-
-## Daemonization
-
-    script/delayed_job_celluloid --daemonize --log /path/to/my/logfile.log start
-    script/delayed_job_celluloid --daemonize --log /path/to/my/logfile.log stop
 
 ## Contributing
 

@@ -19,20 +19,38 @@ module DelayedJobCelluloid
       parse_options(args)
     end
 
-    def daemonize
-
-      Daemons.run_proc('delayed_job_celluloid', :dir => @options[:pid_dir], :dir_mode => :normal, :monitor => @monitor,
-                                                                                            :ARGV => @args) do |*_args|
-        Celluloid.register_shutdown
-        Celluloid.start
-        DelayedJobCelluloid.logger = Logger.new(@options[:log_file])
-        logger.formatter = proc do |severity, datetime, progname, msg|
-          "#{datetime}: #{msg}\n"
+    def daemonize 
+      begin
+        require 'daemons'
+        dir = @options[:pid_dir]
+        Dir.mkdir(dir) unless File.exist?(dir)
+        
+        before_fork
+        Daemons.run_proc('delayed_job_celluloid', :dir => @options[:pid_dir], :dir_mode => :normal, :monitor => @monitor, :ARGV => @args) do |*_args|
+          Celluloid.register_shutdown
+          Celluloid.start
+          launch_celluloid(false)
         end
+        
+      rescue LoadError
+        raise "You need to add gem 'daemons' to your Gemfile if you wish to daemonize delayed_job_celluloid."
+      end
+    end
 
-        logger.info 'Celluloid daemon started'
-        $0 = File.join(@options[:prefix], 'delayed_job_celluloid') if @options[:prefix]
-        launch_celluloid(false)
+    def before_fork
+      @files_to_reopen = []
+        ObjectSpace.each_object(File) do |file|
+        @files_to_reopen << file unless file.closed?
+      end
+    end
+    
+    def after_fork
+      @files_to_reopen.each do |file|
+        begin
+          file.reopen file.path, "a+"
+          file.sync = true
+        rescue ::Exception
+        end
       end
     end
 
@@ -47,7 +65,7 @@ module DelayedJobCelluloid
     end
 
     def launch_celluloid(in_foreground = true)
-
+      
       if in_foreground
         Celluloid.start
         self_read, self_write = IO.pipe
@@ -62,6 +80,15 @@ module DelayedJobCelluloid
       @launcher = Launcher.new(@options, @worker_count)
 
       unless in_foreground
+        after_fork
+        log_file = @options[:log_file] ||= 'delayed_job_celluloid.log'
+        DelayedJobCelluloid.logger = Logger.new(File.join(Rails.root, 'log', log_file))
+        DelayedJobCelluloid.logger.formatter = proc do |severity, datetime, progname, msg|
+          "#{datetime}: #{msg}\n"
+        end
+        Delayed::Worker.logger ||= Logger.new(File.join(Rails.root, 'log', 'delayed_job.log'))
+        DelayedJobCelluloid.logger.info 'delayed_job_celluloid daemon started'
+        
         # Daemonized - wait to receive a signal
         %w(INT TERM).each do |sig|
           trap sig do
@@ -71,8 +98,6 @@ module DelayedJobCelluloid
       end
 
       begin
-
-        logger.info 'Begin celluloid launcher'
         @launcher.run
 
         if in_foreground
@@ -81,20 +106,18 @@ module DelayedJobCelluloid
             handle_signal(signal)
           end
         else
-
           # Sleep for a bit
           while true
             sleep 60
           end
-
         end
       rescue Interrupt
-        logger.info 'Shutting down celluloid launcher'
+        logger.info 'Shutting down delayed_job_celluloid'
         @launcher.stop
         exit(0)
 
       rescue => e
-        DelayedJobCelluloid.logger.info "Exception: #{e.message}"
+        DelayedJobCelluloid.logger.error "Exception: #{e.message}"
         DelayedJobCelluloid.logger.info Kernel.caller
       end
     end
@@ -110,10 +133,11 @@ module DelayedJobCelluloid
       @options = {
         :quiet => true,
         :timeout => 8,
-        :log_file => 'celluloid.log'
+        :pid_dir => "#{Rails.root}/tmp/pids"
       }
 
       @worker_count = 2
+      @monitor = false
 
       opts = OptionParser.new do |opts|
         opts.banner = "Usage: #{File.basename($0)} [options] start|stop|restart|run"
@@ -158,11 +182,17 @@ module DelayedJobCelluloid
         opts.on('-t', '--timeout NUM', "Shutdown timeout") do |prefix|
           @options[:timeout] = Integer(arg)
         end
-        opts.on('--daemonize', "Daemonize") do
+        opts.on('-d', '--daemonize', "Daemonize process") do
           @options[:daemonize] = true
         end
-        opts.on('--log FILE', "Log file for celluloid") do |log_file|
+        opts.on('-L', '--log FILE', "Name of log file") do |log_file|
           @options[:log_file] = log_file
+        end
+        opts.on('-m', '--monitor', 'Start monitor process.') do
+          @monitor = true
+        end
+        opts.on('--pid-dir=DIR', 'Specifies an alternate directory in which to store the process ids.') do |dir|
+          @options[:pid_dir] = dir
         end
       end
       @args = opts.parse!(args)
